@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
 import { Box, Slider, IconButton, Typography } from "@mui/material";
 import PlayCircleFilledIcon from "@mui/icons-material/PlayCircleFilled";
@@ -12,7 +13,21 @@ import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 declare global {
   interface Window {
     onSpotifyWebPlaybackSDKReady: () => void;
-    Spotify: any;
+    Spotify: {
+      Player: new (options: { name: string; getOAuthToken: (cb: (token: string) => void) => void; volume: number }) => {
+        addListener: (event: string, callback: (data: any) => void) => void;
+        connect: () => void;
+        disconnect: () => void;
+        resume: () => void;
+        pause: () => void;
+        nextTrack: () => void;
+        previousTrack: () => void;
+        setShuffle: (shuffle: boolean) => void;
+        setRepeat: (mode: "track" | "context" | "off") => void;
+        setVolume: (volume: number) => void;
+        seek: (position: number) => void;
+      };
+    };
   }
 }
 
@@ -52,7 +67,7 @@ const MusicPlayer = () => {
         if (state && state.track_window?.current_track) {
           setTrack({
             name: state.track_window.current_track.name,
-            artist: state.track_window.current_track.artists.map((a) => a.name).join(", "),
+            artist: state.track_window.current_track.artists.map((a: { name: any; }) => a.name).join(", "),
             albumCover: state.track_window.current_track.album.images[0].url,
           });
           setPosition(state.position);
@@ -106,14 +121,6 @@ const MusicPlayer = () => {
     }
   };
 
-  const handleVolumeChange = (newValue: number | number[]) => {
-    if (player) {
-      const volumeValue = newValue as number;
-      player.setVolume(volumeValue);
-      setVolume(volumeValue);
-      setIsMuted(volumeValue === 0);
-    }
-  };
 
   const handleMuteToggle = () => {
     if (player) {
@@ -123,12 +130,6 @@ const MusicPlayer = () => {
     }
   };
 
-  const handleSeek = (newValue: number | number[]) => {
-    if (player) {
-      const seekPosition = (newValue as number) * duration;
-      player.seek(seekPosition);
-    }
-  };
 
   return (
     <Box
@@ -187,7 +188,7 @@ const MusicPlayer = () => {
         </Typography>
         <Slider
   value={(position / duration) * 100 || 0}
-  onChange={(e, newValue) => {
+  onChange={(_e, newValue) => {
     const seekPosition = (newValue as number) * duration;
     player?.seek(seekPosition);
   }}
@@ -205,7 +206,7 @@ const MusicPlayer = () => {
         </IconButton>
         <Slider
           value={volume * 100}
-          onChange={(e, newValue) => {
+          onChange={(_e, newValue) => {
             const volumeValue = newValue as number;
             player?.setVolume(volumeValue / 100);
             setVolume(volumeValue / 100);

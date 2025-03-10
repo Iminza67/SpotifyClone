@@ -1,5 +1,5 @@
 import React from "react";
-import { AppBar, Toolbar, Typography, Button, Box, TextField } from "@mui/material";
+import { AppBar, Toolbar, Typography, Button, TextField } from "@mui/material";
 
 interface HeaderProps {
   onLogout: () => void;
