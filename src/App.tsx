@@ -51,7 +51,7 @@ const App = () => {
       if (accessToken) {
         setToken(accessToken);
         localStorage.setItem("spotify_token", accessToken);
-        window.location.hash = "";
+        window.location.hash = ""; // Clear URL hash
       }
     } else {
       const storedToken = localStorage.getItem("spotify_token");
@@ -151,21 +151,34 @@ const App = () => {
 
     const fetchPlaylists = async () => {
       try {
+        const token = localStorage.getItem("spotify_token");
+        if (!token) {
+          setError("No access token found. Please log in again.");
+          return;
+        }
+    
         const response = await fetch("https://api.spotify.com/v1/me/playlists", {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
         });
-
+    
         if (!response.ok) {
-          throw new Error("Error fetching playlists");
+          if (response.status === 401) {
+            // Token is expired or invalid
+            localStorage.removeItem("spotify_token");
+            window.location.href = "/"; // Redirect to login page
+            return;
+          }
+          throw new Error(`Error fetching playlists: ${response.statusText}`);
         }
-
+    
         const data = await response.json();
         setPlaylists(data.items);
-      } catch {
-        setError("Error fetching playlists.");
+      } catch (err: any) {
+        console.error("Error fetching playlists:", err.message);
+        setError(err.message);
       }
     };
 

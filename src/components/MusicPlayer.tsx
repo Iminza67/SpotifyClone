@@ -30,78 +30,57 @@ const MusicPlayer = () => {
   useEffect(() => {
     const token = localStorage.getItem("spotify_token");
     if (!token) return;
-
-    const loadSpotifySDK = () => {
-      if (!window.Spotify) {
-        const script = document.createElement("script");
-        script.src = "https://sdk.scdn.co/spotify-player.js";
-        script.async = true;
-        script.onload = setupPlayer;
-        document.body.appendChild(script);
-      } else {
-        setupPlayer();
-      }
-    };
-
-    const setupPlayer = () => {
-      window.onSpotifyWebPlaybackSDKReady = () => {
-        const newPlayer = new window.Spotify.Player({
-          name: "My Music Player",
-          getOAuthToken: (cb: (token: string) => void) => cb(token),
-          volume: volume,
-        });
-
-        newPlayer.addListener("ready", ({ device_id }: { device_id: string }) => {
-          console.log("Ready with Device ID", device_id);
-        });
-
-        newPlayer.addListener("player_state_changed", (state: any) => {
-          if (!state) return;
-
-          setIsPaused(state.paused);
-          setPosition(state.position);
-          setDuration(state.duration);
+  
+    const script = document.createElement("script");
+    script.src = "https://sdk.scdn.co/spotify-player.js";
+    script.async = true;
+  
+    document.body.appendChild(script);
+  
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      const player = new window.Spotify.Player({
+        name: "My Spotify Player",
+        getOAuthToken: (cb) => cb(token),
+        volume: 0.5,
+      });
+  
+      player.addListener("ready", ({ device_id }) => {
+        console.log("Ready with Device ID", device_id);
+      });
+  
+      player.addListener("player_state_changed", (state) => {
+        if (state && state.track_window?.current_track) {
           setTrack({
             name: state.track_window.current_track.name,
-            artist: state.track_window.current_track.artists.map((a: any) => a.name).join(", "),
+            artist: state.track_window.current_track.artists.map((a) => a.name).join(", "),
             albumCover: state.track_window.current_track.album.images[0].url,
           });
-        });
-
-        newPlayer.addListener("initialization_error", ({ message }: { message: string }) => {
-          console.error("Initialization error:", message);
-        });
-
-        newPlayer.addListener("authentication_error", ({ message }: { message: string }) => {
-          console.error("Authentication error:", message);
-        });
-
-        newPlayer.addListener("account_error", ({ message }: { message: string }) => {
-          console.error("Account error:", message);
-        });
-
-        newPlayer.connect().then((success: boolean) => {
-          if (success) {
-            console.log("Connected to Spotify Web Playback SDK");
-            setPlayer(newPlayer);
-          }
-        });
-      };
+          setPosition(state.position);
+          setDuration(state.duration);
+          setIsPaused(state.paused);
+        }
+      });
+  
+      player.connect();
+      setPlayer(player);
     };
-
-    loadSpotifySDK();
-
-    // Cleanup on unmount
+  
     return () => {
       if (player) {
         player.disconnect();
       }
     };
-  }, [volume]);
+  }, );
 
   const handlePlayPause = () => {
     if (player) {
-      isPaused ? player.resume() : player.pause();
+      if (isPaused) {
+        player.resume();
+        setIsPaused(false);
+      } else {
+        player.pause();
+        setIsPaused(true);
+      }
     }
   };
 
@@ -207,10 +186,13 @@ const MusicPlayer = () => {
           {new Date(position).toISOString().substr(14, 5)}
         </Typography>
         <Slider
-          value={(position / duration) * 100 || 0}
-          onChange={(e, newValue) => handleSeek(newValue)}
-          sx={{ width: 200, color: "#1DB954" }}
-        />
+  value={(position / duration) * 100 || 0}
+  onChange={(e, newValue) => {
+    const seekPosition = (newValue as number) * duration;
+    player?.seek(seekPosition);
+  }}
+  sx={{ width: 200, color: "#1DB954" }}
+/>
         <Typography variant="body2" sx={{ color: "#ffffff" }}>
           {new Date(duration).toISOString().substr(14, 5)}
         </Typography>
@@ -222,13 +204,14 @@ const MusicPlayer = () => {
           {isMuted ? <VolumeOffIcon sx={{ color: "#ffffff" }} /> : <VolumeUpIcon sx={{ color: "#ffffff" }} />}
         </IconButton>
         <Slider
-          value={volume}
-          min={0}
-          max={1}
-          step={0.01}
-          onChange={(e, newValue) => handleVolumeChange(newValue)}
-          sx={{ width: 100, color: "#1DB954" }}
-        />
+          value={volume * 100}
+          onChange={(e, newValue) => {
+            const volumeValue = newValue as number;
+            player?.setVolume(volumeValue / 100);
+            setVolume(volumeValue / 100);
+            setIsMuted(volumeValue === 0);
+          }}
+          sx={{ width: 100, color: "#1DB954" }} />
       </Box>
     </Box>
   );
