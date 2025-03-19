@@ -13,21 +13,7 @@ import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 declare global {
   interface Window {
     onSpotifyWebPlaybackSDKReady: () => void;
-    Spotify: {
-      Player: new (options: { name: string; getOAuthToken: (cb: (token: string) => void) => void; volume: number }) => {
-        addListener: (event: string, callback: (data: any) => void) => void;
-        connect: () => void;
-        disconnect: () => void;
-        resume: () => void;
-        pause: () => void;
-        nextTrack: () => void;
-        previousTrack: () => void;
-        setShuffle: (shuffle: boolean) => void;
-        setRepeat: (mode: "track" | "context" | "off") => void;
-        setVolume: (volume: number) => void;
-        seek: (position: number) => void;
-      };
-    };
+    Spotify: typeof Spotify;
   }
 }
 
@@ -49,25 +35,24 @@ const MusicPlayer = () => {
     const script = document.createElement("script");
     script.src = "https://sdk.scdn.co/spotify-player.js";
     script.async = true;
-  
     document.body.appendChild(script);
   
     window.onSpotifyWebPlaybackSDKReady = () => {
-      const player = new window.Spotify.Player({
+      const playerInstance = new window.Spotify.Player({
         name: "My Spotify Player",
         getOAuthToken: (cb) => cb(token),
         volume: 0.5,
       });
-  
-      player.addListener("ready", ({ device_id }) => {
+
+      playerInstance.addListener("ready", ({ device_id }) => {
         console.log("Ready with Device ID", device_id);
       });
-  
-      player.addListener("player_state_changed", (state) => {
+
+      playerInstance.addListener("player_state_changed", (state) => {
         if (state && state.track_window?.current_track) {
           setTrack({
             name: state.track_window.current_track.name,
-            artist: state.track_window.current_track.artists.map((a: { name: any; }) => a.name).join(", "),
+            artist: state.track_window.current_track.artists.map((a: { name: string }) => a.name).join(", "),
             albumCover: state.track_window.current_track.album.images[0].url,
           });
           setPosition(state.position);
@@ -75,52 +60,43 @@ const MusicPlayer = () => {
           setIsPaused(state.paused);
         }
       });
-  
-      player.connect();
-      setPlayer(player);
-    };
-  
-    return () => {
-      if (player) {
-        player.disconnect();
-      }
-    };
-  }, );
 
-  const handlePlayPause = () => {
+      playerInstance.connect();
+      setPlayer(playerInstance);
+    };
+
+    return () => {
+      player?.disconnect();
+    };
+  }, [player]);
+
+  function handlePlayPause() {
     if (player) {
       if (isPaused) {
         player.resume();
-        setIsPaused(false);
       } else {
         player.pause();
-        setIsPaused(true);
       }
+      setIsPaused(!isPaused);
     }
-  };
+  }
 
-  const handleNextTrack = () => {
-    player?.nextTrack();
-  };
-
-  const handlePreviousTrack = () => {
-    player?.previousTrack();
-  };
-
+  const handleNextTrack = () => player?.nextTrack();
+  const handlePreviousTrack = () => player?.previousTrack();
+  
   const handleShuffleToggle = () => {
-    setShuffle(!shuffle);
     if (player) {
       player.setShuffle(!shuffle);
+      setShuffle(!shuffle);
     }
   };
 
   const handleRepeatToggle = () => {
-    setRepeat(!repeat);
     if (player) {
       player.setRepeat(!repeat ? "track" : "off");
+      setRepeat(!repeat);
     }
   };
-
 
   const handleMuteToggle = () => {
     if (player) {
@@ -129,7 +105,6 @@ const MusicPlayer = () => {
       setIsMuted(!isMuted);
     }
   };
-
 
   return (
     <Box
@@ -187,13 +162,13 @@ const MusicPlayer = () => {
           {new Date(position).toISOString().substr(14, 5)}
         </Typography>
         <Slider
-  value={(position / duration) * 100 || 0}
-  onChange={(_e, newValue) => {
-    const seekPosition = (newValue as number) * duration;
-    player?.seek(seekPosition);
-  }}
-  sx={{ width: 200, color: "#1DB954" }}
-/>
+          value={(position / duration) * 100 || 0}
+          onChange={(_e, newValue) => {
+            const seekPosition = (newValue as number / 100) * duration;
+            player?.seek(seekPosition);
+          }}
+          sx={{ width: 200, color: "#1DB954" }}
+        />
         <Typography variant="body2" sx={{ color: "#ffffff" }}>
           {new Date(duration).toISOString().substr(14, 5)}
         </Typography>
@@ -207,12 +182,13 @@ const MusicPlayer = () => {
         <Slider
           value={volume * 100}
           onChange={(_e, newValue) => {
-            const volumeValue = newValue as number;
-            player?.setVolume(volumeValue / 100);
-            setVolume(volumeValue / 100);
+            const volumeValue = (newValue as number) / 100;
+            player?.setVolume(volumeValue);
+            setVolume(volumeValue);
             setIsMuted(volumeValue === 0);
           }}
-          sx={{ width: 100, color: "#1DB954" }} />
+          sx={{ width: 100, color: "#1DB954" }}
+        />
       </Box>
     </Box>
   );
