@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from "react";
 
-// Define the Spotify Player type
+// Define necessary interfaces
+interface PlaybackState {
+  track_window: {
+    current_track: {
+      name: string;
+      artists: { name: string }[];
+    };
+  };
+  paused: boolean;
+}
+
 interface SpotifyPlayer {
   addListener(event: string, callback: (state: PlaybackState | null) => void): void;
   removeListener(event: string, callback: (state: PlaybackState | null) => void): void;
@@ -20,26 +30,12 @@ interface SpotifyPlayerProps {
   player: SpotifyPlayer | null;
   playlists: Playlist[];
   error: string | null;
-  onPlayPause: () => void;
+  track: Track | null;
+  onPlayPause: () => Promise<void> | undefined;
 }
 
-interface SpotifyPlayer {
-  addListener(event: string, callback: (state: PlaybackState | null) => void): void;
-  removeListener(event: string, callback: (state: PlaybackState | null) => void): void;
-}
-
-interface PlaybackState {
-  track_window: {
-    current_track: {
-      name: string;
-      artists: { name: string }[];
-    };
-  };
-  paused: boolean;
-}
-
-const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ player, playlists, error, onPlayPause }) => {
-  const [track, setTrack] = useState<Track | null>(null);
+const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ player, playlists, error, track, onPlayPause }) => {
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(track);
   const [isPaused, setIsPaused] = useState<boolean>(true);
 
   useEffect(() => {
@@ -47,7 +43,7 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ player, playlists, error,
 
     const handleStateChange = (state: PlaybackState | null) => {
       if (state?.track_window?.current_track) {
-        setTrack({
+        setCurrentTrack({
           name: state.track_window.current_track.name,
           artist: state.track_window.current_track.artists.map((artist) => artist.name).join(", "),
         });
@@ -65,10 +61,10 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ player, playlists, error,
   return (
     <div style={{ padding: "20px", background: "#222", color: "#fff" }}>
       <h2>Spotify Player</h2>
-      {track ? (
+      {currentTrack ? (
         <>
-          <p>Now Playing: {track.name}</p>
-          <p>Artist: {track.artist}</p>
+          <p>Now Playing: {currentTrack.name}</p>
+          <p>Artist: {currentTrack.artist}</p>
           <button onClick={onPlayPause}>{isPaused ? "Play" : "Pause"}</button>
         </>
       ) : (

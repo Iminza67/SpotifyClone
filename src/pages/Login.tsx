@@ -1,4 +1,3 @@
-// src/pages/Login/Login.tsx
 import React, { useState, useEffect } from 'react';
 import {
   Button,
@@ -15,38 +14,36 @@ import {
   ThemeProvider,
   createTheme,
 } from '@mui/material';
-
-import { Brightness4, Brightness7 } from '@mui/icons-material'; // Icons for dark/light mode
+import { Brightness4, Brightness7, Instagram, Twitter } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom'; // For navigation
 import '../styles/Login.css'; // Custom CSS for animations and styling
 
-const SPOTIFY_AUTH_URL = `https://accounts.spotify.com/authorize?client_id=e97ff34d76a84591bad398b97ebe5351&redirect_uri=${encodeURIComponent(
-  'http://localhost:5173/callback'
-)}&response_type=token&scope=user-read-private user-read-email`;
+interface LoginProps {
+  authUrl: string;
+}
 
-const Login = () => {
+const Login: React.FC<LoginProps> = ({ authUrl }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError]: [string | null, React.Dispatch<React.SetStateAction<string | null>>] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [language, setLanguage] = useState('en');
   const [darkMode, setDarkMode] = useState(false);
-
+  const navigate = useNavigate(); // Replaces window.location.href
 
   useEffect(() => {
     const hash = window.location.hash;
     if (hash) {
       const token = hash
-        .substring(1) // Remove the '#' from the beginning
-        .split('&') // Split into key-value pairs
-        .find(elem => elem.startsWith('access_token')) // Find the access token
-        ?.split('=')[1]; // Extract the token value
+        .substring(1)
+        .split('&')
+        .find(elem => elem.startsWith('access_token'))
+        ?.split('=')[1];
 
       if (token) {
-        console.log('Access Token:', token); // Log the token for debugging
-        localStorage.setItem('spotify_token', token); // Save the token in localStorage
-        window.location.hash = ''; // Clear the hash from the URL
-        window.location.href = '/home'; // Redirect to the home page
+        console.log('Access Token:', token);
+        localStorage.setItem('spotify_token', token);
+        navigate('/home'); // Navigate instead of changing href
       } else {
-        // Handle errors
         const error = hash
           .substring(1)
           .split('&')
@@ -54,19 +51,18 @@ const Login = () => {
           ?.split('=')[1];
 
         if (error) {
-          setError('Login failed. Please try again.'); // Set error message
+          setError('Login failed. Please try again.');
         }
       }
     }
-  }, []); // Run this effect only once on component mount
+  }, [navigate]);
 
   const handleLogin = () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // Redirect to Spotify's authorization page
-      window.location.href = SPOTIFY_AUTH_URL;
+      window.location.href = authUrl;
     } catch {
       setError('An error occurred while trying to log in. Please try again.');
       setIsLoading(false);
@@ -74,29 +70,21 @@ const Login = () => {
   };
 
   const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
+    setDarkMode(prevMode => !prevMode); // Functional state update
   };
 
   const customTheme = createTheme({
     palette: {
       mode: darkMode ? 'dark' : 'light',
-      primary: {
-        main: '#1DB954', // Spotify green
-      },
-      background: {
-        default: darkMode ? '#121212' : '#ffffff',
-        paper: darkMode ? '#1E1E1E' : '#f5f5f5',
-      },
+      primary: { main: '#1DB954' },
+      background: { default: darkMode ? '#121212' : '#ffffff', paper: darkMode ? '#1E1E1E' : '#f5f5f5' },
     },
-    typography: {
-      fontFamily: 'Montserrat, sans-serif', // Use a Spotify-like font
-    },
+    typography: { fontFamily: 'Montserrat, sans-serif' },
   });
 
   return (
     <ThemeProvider theme={customTheme}>
-      {/* Gradient Background */}
-         <Box className="gradient-background" />
+      <Box className="gradient-background" />
       <Container
         maxWidth="sm"
         sx={{
@@ -110,8 +98,6 @@ const Login = () => {
           zIndex: 1,
         }}
       >
-
-
         <Paper
           elevation={3}
           sx={{
@@ -125,31 +111,24 @@ const Login = () => {
             maxWidth: '400px',
           }}
         >
-          {/* Dark Mode Toggle */}
-          <IconButton
-            onClick={toggleDarkMode}
-            sx={{ position: 'absolute', top: 16, right: 16 }}
-          >
+          <IconButton onClick={toggleDarkMode} sx={{ position: 'absolute', top: 16, right: 16 }}>
             {darkMode ? <Brightness7 /> : <Brightness4 />}
           </IconButton>
 
-
-          {/* Title */}
           <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold' }}>
             Welcome to My Music Player
           </Typography>
 
-          {/* Description */}
           <Typography variant="body1" sx={{ mb: 4, color: darkMode ? '#b3b3b3' : '#666666' }}>
             Log in with your Spotify account to access your playlists and start listening.
           </Typography>
 
-          {/* Language Selection */}
           <Box sx={{ mb: 3 }}>
             <Select
               value={language}
               onChange={(e) => setLanguage(e.target.value as string)}
               sx={{ width: '100%', borderRadius: '20px' }}
+              MenuProps={{ disableScrollLock: true }} // Prevents layout shift
             >
               <MenuItem value="en">English</MenuItem>
               <MenuItem value="es">Español</MenuItem>
@@ -159,20 +138,12 @@ const Login = () => {
             </Select>
           </Box>
 
-          {/* Remember Me Checkbox */}
           <FormControlLabel
-            control={
-              <Checkbox
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                color="primary"
-              />
-            }
+            control={<Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} color="primary" />}
             label="Remember Me"
             sx={{ mb: 3, color: darkMode ? '#b3b3b3' : '#666666' }}
           />
 
-          {/* Login Button */}
           <Button
             variant="contained"
             color="primary"
@@ -186,38 +157,28 @@ const Login = () => {
               fontSize: '16px',
               fontWeight: 'bold',
               width: '100%',
-              '&:hover': {
-                backgroundColor: '#1ED760',
-              },
+              '&:hover': { backgroundColor: '#1ED760' },
             }}
           >
             {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Login with Spotify'}
           </Button>
 
-          {/* Error Message */}
-          {error && (
-            <Typography variant="body2" color="error" sx={{ mt: 2 }}>
-              {error}
-            </Typography>
-          )}
+          {error && <Typography variant="body2" color="error" sx={{ mt: 2 }}>{error}</Typography>}
 
-          {/* Social Media Links */}
           <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center', gap: 2 }}>
             <IconButton href="https://twitter.com" target="_blank">
-              <img src="/Logos/x-logo.png" alt="Twitter" width={24} height={24} />
+              <Twitter sx={{ color: '#1DA1F2' }} />
             </IconButton>
             <IconButton href="https://instagram.com" target="_blank">
-              <img src="/Logos/instagram-logo.png" alt="Instagram" width={24} height={24} />
+              <Instagram sx={{ color: '#E1306C' }} />
             </IconButton>
           </Box>
 
-          {/* Terms and Conditions */}
           <Typography variant="body2" sx={{ mt: 3, color: darkMode ? '#b3b3b3' : '#666666' }}>
             By logging in, you agree to our{' '}
             <a href="/terms" target="_blank" style={{ color: '#1DB954', textDecoration: 'none' }}>
               Terms and Conditions
-            </a>
-            .
+            </a>.
           </Typography>
         </Paper>
       </Container>
