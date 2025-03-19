@@ -1,10 +1,8 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useState } from "react";
-import { BrowserRouter as Router, Route, Routes, useNavigate } from "react-router-dom";
+import { Route, Routes, useNavigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
-import SpotifyPlayer from "./components/SpotifyPlayer";
-//import Callback from "./pages/Callback";
 
 const SPOTIFY_SCOPES = [
   "user-read-private",
@@ -16,100 +14,118 @@ const SPOTIFY_SCOPES = [
   "playlist-read-collaborative",
 ].join("%20");
 
-const CLIENT_ID = "e97ff34d76a84591bad398b97ebe5351"; // Replace with actual Client ID
+const CLIENT_ID = "e97ff34d76a84591bad398b97ebe5351"; // Replace with your Client ID
 const REDIRECT_URI = "http://localhost:5173/callback";
 const AUTH_URL = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=token&redirect_uri=${REDIRECT_URI}&scope=${SPOTIFY_SCOPES}`;
 
-declare global {
-  interface Window {
-    onSpotifyWebPlaybackSDKReady: () => void;
-    Spotify: typeof Spotify;
+const getStoredToken = () => {
+  const token = localStorage.getItem("spotify_token");
+  const expiry = localStorage.getItem("spotify_token_expiry");
+
+  if (!token || !expiry) return null;
+
+  if (Date.now() > parseInt(expiry)) {
+    console.warn("Token expired, redirecting to login");
+    localStorage.removeItem("spotify_token");
+    localStorage.removeItem("spotify_token_expiry");
+    return null;
   }
-}
 
-interface Track {
-  name: string;
-  artist: string;
-}
-
-interface Playlist {
-  id: string;
-  name: string;
-  tracks: { total: number };
-}
+  return token;
+};
 
 const App = () => {
-  const [token, setToken] = useState<string | null>(localStorage.getItem("spotify_token"));
+  const [token, setToken] = useState<string | null>(getStoredToken());
   const [player, setPlayer] = useState<Spotify.Player | null>(null);
-  const [, setDeviceId] = useState<string | null>(null);
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [track, setTrack] = useState<Track | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const hash = window.location.hash;
     if (hash) {
-      const accessToken = new URLSearchParams(hash.substring(1)).get("access_token");
+      const params = new URLSearchParams(hash.substring(1));
+      const accessToken = params.get("access_token");
+      const expiresIn = parseInt(params.get("expires_in") || "3600") * 1000;
+      const expiryTime = Date.now() + expiresIn;
+
       if (accessToken) {
         setToken(accessToken);
         localStorage.setItem("spotify_token", accessToken);
+        localStorage.setItem("spotify_token_expiry", expiryTime.toString());
         window.location.hash = "";
         navigate("/home");
       }
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     if (!token) return;
 
-    const script = document.createElement("script");
-    script.src = "https://sdk.scdn.co/spotify-player.js";
-    script.async = true;
-    script.onload = () => {
-      window.onSpotifyWebPlaybackSDKReady = () => {
-        const newPlayer = new window.Spotify.Player({
-          name: "My Spotify Player",
-          getOAuthToken: (cb) => cb(token),
-          volume: 0.5,
-        });
-
-        newPlayer.addListener("ready", ({ device_id }) => {
-          setDeviceId(device_id);
-          transferPlaybackToDevice(device_id);
-        });
-
-        newPlayer.addListener("player_state_changed", (state) => {
-          if (state && state.track_window?.current_track) {
-            setTrack({
-              name: state.track_window.current_track.name,
-              artist: state.track_window.current_track.artists.map((artist) => artist.name).join(", "),
-            });
-          }
-        });
-
-        newPlayer.addListener("initialization_error", ({ message }) => setError(message));
-        newPlayer.addListener("authentication_error", ({ message }) => setError(message));
-        newPlayer.addListener("account_error", ({ message }) => setError(message));
-
-        newPlayer.connect().then((success) => {
-          if (success) {
-            setPlayer(newPlayer);
-          }
-        });
-      };
+    // Ensure `onSpotifyWebPlaybackSDKReady` is set **before** loading the script
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      console.log("Spotify SDK Ready! Initializing player...");
+      setupSpotifyPlayer();
     };
-    document.body.appendChild(script);
+
+    if (!document.getElementById("spotify-player-script")) {
+      console.log("Loading Spotify Web Playback SDK...");
+      const script = document.createElement("script");
+      script.id = "spotify-player-script";
+      script.src = "https://sdk.scdn.co/spotify-player.js";
+      script.async = true;
+      document.body.appendChild(script);
+    } else {
+      console.log("Spotify SDK already loaded.");
+      if (window.Spotify) {
+        setupSpotifyPlayer();
+      }
+    }
 
     return () => {
       if (player) {
+        console.log("Disconnecting Spotify Player...");
         player.disconnect();
       }
     };
-  }, [token]);
+  }, [token, player]);
 
-  const transferPlaybackToDevice = async (device_id: string) => {
-    if (!token) return;
+  const setupSpotifyPlayer = () => {
+    if (!window.Spotify || !token) {
+      console.error("Spotify SDK not available or token missing.");
+      return;
+    }
+
+    console.log("Setting up Spotify Player...");
+    const newPlayer = new window.Spotify.Player({
+      name: "Spotify Web Player",
+      getOAuthToken: (cb) => cb(token),
+      volume: 0.5,
+    });
+
+    newPlayer.addListener("ready", ({ device_id }) => {
+      console.log("Spotify Web Playback SDK Ready! Device ID:", device_id);
+      transferPlaybackToDevice(device_id);
+    });
+
+    newPlayer.addListener("initialization_error", ({ message }) => console.error("Initialization Error:", message));
+    newPlayer.addListener("authentication_error", ({ message }) => console.error("Authentication Error:", message));
+    newPlayer.addListener("account_error", ({ message }) => console.error("Account Error:", message));
+    newPlayer.addListener("playback_error", ({ message }) => console.error("Playback Error:", message));
+
+    newPlayer.connect().then((success) => {
+      if (success) {
+        console.log("Spotify Player connected successfully.");
+        setPlayer(newPlayer);
+      } else {
+        console.error("Failed to connect Spotify Player.");
+      }
+    });
+  };
+
+  const transferPlaybackToDevice = async (deviceId: string) => {
+    if (!token) {
+      console.error("No token available.");
+      return;
+    }
 
     try {
       const response = await fetch("https://api.spotify.com/v1/me/player", {
@@ -118,63 +134,24 @@ const App = () => {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ device_ids: [device_id], play: true }),
+        body: JSON.stringify({ device_ids: [deviceId], play: true }),
       });
 
-      if (!response.ok) throw new Error(`Failed to transfer playback: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Failed to transfer playback: ${response.statusText}`);
+      }
+
+      console.log("Playback transferred to Web Player.");
     } catch (error) {
       console.error("Error transferring playback:", error);
     }
   };
 
-  useEffect(() => {
-    if (!token) return;
-
-    const fetchPlaylists = async () => {
-      try {
-        const response = await fetch("https://api.spotify.com/v1/me/playlists", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            localStorage.removeItem("spotify_token");
-            navigate("/");
-            return;
-          }
-          throw new Error(`Error fetching playlists: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        setPlaylists(data.items);
-      } catch (error) {
-        setError(error instanceof Error ? error.message : "Unknown error");
-      }
-    };
-
-    fetchPlaylists();
-  }, [token]);
-
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Login authUrl={AUTH_URL} />} />
-        <Route path="/home" element={<Home />} />
-      </Routes>
-
-      {token && (
-        <SpotifyPlayer
-          player={player}
-          playlists={playlists}
-          error={error}
-          track={track}
-          onPlayPause={() => player?.togglePlay()}
-        />
-      )}
-    </Router>
+    <Routes>
+      <Route path="/login" element={<Login authUrl={AUTH_URL} />} />
+      <Route path="/home" element={<Home player={player} />} />
+    </Routes>
   );
 };
 

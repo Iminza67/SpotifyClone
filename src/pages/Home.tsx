@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Container, Grid, Typography, CircularProgress } from "@mui/material";
 import Header from "../components/Header";
 import PlaylistCard from "../components/PlaylistCard";
@@ -20,7 +20,13 @@ interface Recommendation {
   artist: string;
 }
 
-const Home = () => {
+interface HomeProps {
+  player: Spotify.Player | null;
+}
+
+const Home: React.FC<HomeProps> = ({ player }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTrack, setCurrentTrack] = useState<{ name: string; artist: string } | null>(null);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [filterPlaylists, setFilterPlaylists] = useState<Playlist[]>([]);
@@ -50,6 +56,26 @@ const Home = () => {
       setIsLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!player) return;
+
+    // Listen for player state changes
+    player.addListener("player_state_changed", (state) => {
+      if (state) {
+        const track = state.track_window.current_track;
+        setCurrentTrack({
+          name: track.name,
+          artist: track.artists.map((artist) => artist.name).join(", "),
+        });
+        setIsPlaying(!state.paused);
+      }
+    });
+
+    return () => {
+      player.removeListener("player_state_changed");
+    };
+  }, [player]);
 
   const fetchPlaylists = async (token: string) => {
     try {
@@ -93,9 +119,16 @@ const Home = () => {
     }
   };
 
+  const handlePlayPause = () => {
+    if (player) {
+      player.togglePlay().then(() => {
+        setIsPlaying((prev) => !prev);
+      });
+    }
+  };
+
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#121212" }}>
-
       <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
         <Header onLogout={handleLogout} onSearch={handleSearch} />
 
@@ -158,7 +191,11 @@ const Home = () => {
         </Box>
 
         <Box sx={{ position: "fixed", bottom: 0, width: "100%", zIndex: 1100 }}>
-          <MusicPlayer />
+          <MusicPlayer
+            currentTrack={currentTrack}
+            isPlaying={isPlaying}
+            onPlayPause={handlePlayPause}
+          />
         </Box>
       </Box>
     </Box>

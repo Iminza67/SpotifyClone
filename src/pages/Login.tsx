@@ -31,26 +31,38 @@ const Login: React.FC<LoginProps> = ({ authUrl }) => {
   const navigate = useNavigate(); // Replaces window.location.href
 
   useEffect(() => {
+    const loadSpotifySDK = () => {
+      if (window.Spotify) return; // Prevent multiple loads
+
+      const script = document.createElement("script");
+      script.src = "https://sdk.scdn.co/spotify-player.js";
+      script.async = true;
+      script.onload = () => {
+        if (window.Spotify) {
+          console.log("Spotify SDK Loaded");
+        } else {
+          setError("Failed to load Spotify SDK.");
+        }
+      };
+
+      document.body.appendChild(script);
+    };
+
+    loadSpotifySDK();
+  }, []);
+
+  useEffect(() => {
     const hash = window.location.hash;
     if (hash) {
-      const token = hash
-        .substring(1)
-        .split('&')
-        .find(elem => elem.startsWith('access_token'))
-        ?.split('=')[1];
+      const token = new URLSearchParams(hash.substring(1)).get("access_token");
 
       if (token) {
         console.log('Access Token:', token);
         localStorage.setItem('spotify_token', token);
         navigate('/home'); // Navigate instead of changing href
       } else {
-        const error = hash
-          .substring(1)
-          .split('&')
-          .find(elem => elem.startsWith('error'))
-          ?.split('=')[1];
-
-        if (error) {
+        const errorParam = new URLSearchParams(hash.substring(1)).get("error");
+        if (errorParam) {
           setError('Login failed. Please try again.');
         }
       }
