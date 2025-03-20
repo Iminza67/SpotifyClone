@@ -15,7 +15,7 @@ const SPOTIFY_SCOPES = [
 ].join("%20");
 
 const CLIENT_ID = "e97ff34d76a84591bad398b97ebe5351"; // Replace with your Client ID
-const REDIRECT_URI = "http://localhost:5173/callback";
+const REDIRECT_URI = "http://localhost:5173/callback"; // Replace with your Redirect URI
 const AUTH_URL = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=token&redirect_uri=${REDIRECT_URI}&scope=${SPOTIFY_SCOPES}`;
 
 const getStoredToken = () => {
